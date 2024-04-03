@@ -971,6 +971,10 @@ public:
         if (next_ >= buffer_end_) details::throw_range_error();
         *next_++ = '\x01';
     }
+
+    template<typename Int_type> void push_back_decimal(int tag, std::pair<Int_type, Int_type> pair) {
+        return push_back_decimal(tag, pair.first, pair.second);
+    }
 //@}
 
 
