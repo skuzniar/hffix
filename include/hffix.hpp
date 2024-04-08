@@ -724,7 +724,7 @@ public:
      * \throw std::out_of_range When the remaining buffer size is too small.
      * \throw std::logic_error When called more than once for a single message.
      */
-    void push_back_header(char const* begin_string_version) {
+    size_t push_back_header(char const* begin_string_version) {
         if (body_length_) throw std::logic_error("hffix message_writer.push_back_header called twice");
         if (buffer_end_ - next_ < 2 + std::ptrdiff_t(strlen(begin_string_version)) + 3 + 7) {
             details::throw_range_error();
@@ -737,8 +737,10 @@ public:
         memcpy(next_, "9=", 2);
         next_ += 2;
         body_length_ = next_;
+        size_t s = message_size();
         next_ += 6; // 6 characters reserved for BodyLength.
         *next_++ = '\x01';
+        return s;
     }
 
 #if __cplusplus >= 201703L
@@ -753,7 +755,7 @@ public:
      * \throw std::out_of_range When the remaining buffer size is too small.
      * \throw std::logic_error When called more than once for a single message.
      */
-    void push_back_header(std::string_view begin_string_version) {
+    size_t push_back_header(std::string_view begin_string_version) {
         if (body_length_) throw std::logic_error("hffix message_writer.push_back_header called twice");
         if (buffer_end_ - next_ < 2 + std::ptrdiff_t(begin_string_version.size()) + 3 + 7) {
             details::throw_range_error();
@@ -766,8 +768,10 @@ public:
         memcpy(next_, "9=", 2);
         next_ += 2;
         body_length_ = next_;
+        size_t s = message_size();
         next_ += 6; // 6 characters reserved for BodyLength.
         *next_++ = '\x01';
+        return s;
     }
 #endif
 
@@ -845,15 +849,17 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_string(int tag, char const* begin, char const* end) {
+    size_t push_back_string(int tag, char const* begin, char const* end) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (buffer_end_ - next_ < (end - begin) + 2) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         memcpy(next_, begin, end - begin);
         next_ += (end - begin);
         *next_++ = '\x01';
+        return s;
     }
 
     /*!
@@ -864,11 +870,11 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_string(int tag, char const* cstring) {
+    size_t push_back_string(int tag, char const* cstring) {
         // Find the end of the cstring, like strlen, but throw if the cstring
         // is longer than the remaining buffer.
         char const* cstring_end = (char const*)memchr(cstring, 0, buffer_end_ - next_);
-        if (cstring_end) push_back_string(tag, cstring, cstring_end);
+        if (cstring_end) return push_back_string(tag, cstring, cstring_end);
         else details::throw_range_error();
     }
 
@@ -883,8 +889,8 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_string(int tag, std::string const& s) {
-        push_back_string(tag, s.data(), s.data() + s.size());
+    size_t push_back_string(int tag, std::string const& s) {
+        return push_back_string(tag, s.data(), s.data() + s.size());
     }
 
 
@@ -899,8 +905,8 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_string(int tag, std::string_view s) {
-        push_back_string(tag, s.begin(), s.end());
+    size_t push_back_string(int tag, std::string_view s) {
+        return push_back_string(tag, s.begin(), s.end());
     }
 #endif
 
@@ -912,14 +918,16 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_char(int tag, char character) {
+    size_t push_back_char(int tag, char character) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (buffer_end_ - next_ < 3) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         *next_++ = character;
         *next_++ = '\x01';
+        return s;
     }
 //@}
 
@@ -934,13 +942,15 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    template<typename Int_type> void push_back_int(int tag, Int_type number) {
+    template<typename Int_type> size_t push_back_int(int tag, Int_type number) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (next_ >= buffer_end_) details::throw_range_error();
         *next_++ = '=';
+        size_t s = message_size();
         next_ = details::itoa(number, next_, buffer_end_);
         if (next_ >= buffer_end_) details::throw_range_error();
         *next_++ = '\x01';
+        return s;
     }
 
 //@}
@@ -963,16 +973,18 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    template<typename Int_type> void push_back_decimal(int tag, Int_type mantissa, Int_type exponent) {
+    template<typename Int_type> size_t push_back_decimal(int tag, Int_type mantissa, Int_type exponent) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (next_ >= buffer_end_) details::throw_range_error();
         *next_++ = '=';
+        size_t s = message_size();
         next_ = details::dtoa(mantissa, exponent, next_, buffer_end_);
         if (next_ >= buffer_end_) details::throw_range_error();
         *next_++ = '\x01';
+        return s;
     }
 
-    template<typename Int_type> void push_back_decimal(int tag, std::pair<Int_type, Int_type> pair) {
+    template<typename Int_type> size_t push_back_decimal(int tag, std::pair<Int_type, Int_type> pair) {
         return push_back_decimal(tag, pair.first, pair.second);
     }
 //@}
@@ -991,12 +1003,13 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_date(int tag, int year, int month, int day) {
+    size_t push_back_date(int tag, int year, int month, int day) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (buffer_end_ - next_ < details::len("=YYYYMMDD|")) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         itoa_padded(year, next_, next_ + 4);
         next_ += 4;
         itoa_padded(month, next_, next_ + 2);
@@ -1004,6 +1017,7 @@ public:
         itoa_padded(day, next_, next_ + 2);
         next_ += 2;
         *next_++ = '\x01';
+        return s;
     }
     /*!
     \brief Append a month-year field to the message.
@@ -1014,17 +1028,19 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_monthyear(int tag, int year, int month) {
+    size_t push_back_monthyear(int tag, int year, int month) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (buffer_end_ - next_ < details::len("=YYYYMM|")) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         itoa_padded(year, next_, next_ + 4);
         next_ += 4;
         itoa_padded(month, next_, next_ + 2);
         next_ += 2;
         *next_++ = '\x01';
+        return s;
     }
 
     /*!
@@ -1041,12 +1057,13 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_timeonly(int tag, int hour, int minute, int second) {
+    size_t push_back_timeonly(int tag, int hour, int minute, int second) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (buffer_end_ - next_ < details::len("=HH:MM:SS|")) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         itoa_padded(hour, next_, next_ + 2);
         next_ += 2;
         *next_++ = ':';
@@ -1056,6 +1073,7 @@ public:
         itoa_padded(second, next_, next_ + 2);
         next_ += 2;
         *next_++ = '\x01';
+        return s;
     }
 
     /*!
@@ -1071,12 +1089,13 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_timeonly(int tag, int hour, int minute, int second, int millisecond) {
+    size_t push_back_timeonly(int tag, int hour, int minute, int second, int millisecond) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (buffer_end_ - next_ < details::len("=HH:MM:SS.sss|")) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         itoa_padded(hour, next_, next_ + 2);
         next_ += 2;
         *next_++ = ':';
@@ -1089,6 +1108,7 @@ public:
         itoa_padded(millisecond, next_, next_ + 3);
         next_ += 3;
         *next_++ = '\x01';
+        return s;
     }
 
     /*!
@@ -1104,12 +1124,13 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_timeonly_nano(int tag, int hour, int minute, int second, int nanosecond) {
+    size_t push_back_timeonly_nano(int tag, int hour, int minute, int second, int nanosecond) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (buffer_end_ - next_ < details::len("=HH:MM:SS.sssssssss|")) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         itoa_padded(hour, next_, next_ + 2);
         next_ += 2;
         *next_++ = ':';
@@ -1122,6 +1143,7 @@ public:
         itoa_padded(nanosecond, next_, next_ + 9);
         next_ += 9;
         *next_++ = '\x01';
+        return s;
     }
 
     /*!
@@ -1141,13 +1163,14 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_timestamp(int tag, int year, int month, int day, int hour, int minute, int second) {
+    size_t push_back_timestamp(int tag, int year, int month, int day, int hour, int minute, int second) {
         next_ = details::itoa(tag, next_, buffer_end_);
 
         if (buffer_end_ - next_ < details::len("=YYYYMMDD-HH:MM:SS|")) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         itoa_padded(year, next_, next_ + 4);
         next_ += 4;
         itoa_padded(month, next_, next_ + 2);
@@ -1164,6 +1187,7 @@ public:
         itoa_padded(second, next_, next_ + 2);
         next_ += 2;
         *next_++ = '\x01';
+        return s;
     }
 
     /*!
@@ -1182,12 +1206,13 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_timestamp(int tag, int year, int month, int day, int hour, int minute, int second, int millisecond) {
+    size_t push_back_timestamp(int tag, int year, int month, int day, int hour, int minute, int second, int millisecond) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (buffer_end_ - next_ < details::len("=YYYYMMDD-HH:MM:SS.sss|")) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         itoa_padded(year, next_, next_ + 4);
         next_ += 4;
         itoa_padded(month, next_, next_ + 2);
@@ -1207,6 +1232,7 @@ public:
         itoa_padded(millisecond, next_, next_ + 3);
         next_ += 3;
         *next_++ = '\x01';
+        return s;
     }
 
     /*!
@@ -1225,12 +1251,13 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_timestamp_nano(int tag, int year, int month, int day, int hour, int minute, int second, int nanosecond) {
+    size_t push_back_timestamp_nano(int tag, int year, int month, int day, int hour, int minute, int second, int nanosecond) {
         next_ = details::itoa(tag, next_, buffer_end_);
         if (buffer_end_ - next_ < details::len("=YYYYMMDD-HH:MM:SS.sssssssss|")) {
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         itoa_padded(year, next_, next_ + 4);
         next_ += 4;
         itoa_padded(month, next_, next_ + 2);
@@ -1250,6 +1277,7 @@ public:
         itoa_padded(nanosecond, next_, next_ + 9);
         next_ += 9;
         *next_++ = '\x01';
+        return s;
     }
 //@}
 
@@ -1268,9 +1296,9 @@ public:
 
     \see HFFIX_NO_BOOST_DATETIME
     */
-    void push_back_date(int tag, boost::gregorian::date date) {
+    size_t push_back_date(int tag, boost::gregorian::date date) {
         if (!date.is_not_a_date())
-            push_back_date(tag, date.year(), date.month(), date.day());
+            return push_back_date(tag, date.year(), date.month(), date.day());
     }
 
     /*!
@@ -1287,9 +1315,9 @@ public:
 
     \see HFFIX_NO_BOOST_DATETIME
     */
-    void push_back_timeonly(int tag, boost::posix_time::time_duration timeonly) {
+    size_t push_back_timeonly(int tag, boost::posix_time::time_duration timeonly) {
         if (!timeonly.is_not_a_date_time())
-            push_back_timeonly(
+            return push_back_timeonly(
                 tag,
                 timeonly.hours(),
                 timeonly.minutes(),
@@ -1312,9 +1340,9 @@ public:
 
     \see HFFIX_NO_BOOST_DATETIME
     */
-    void push_back_timeonly_nano(int tag, boost::posix_time::time_duration timeonly) {
+    size_t push_back_timeonly_nano(int tag, boost::posix_time::time_duration timeonly) {
         if (!timeonly.is_not_a_date_time())
-            push_back_timeonly_nano(
+            return push_back_timeonly_nano(
                 tag,
                 timeonly.hours(),
                 timeonly.minutes(),
@@ -1337,9 +1365,9 @@ public:
 
     \see HFFIX_NO_BOOST_DATETIME
     */
-    void push_back_timestamp(int tag, boost::posix_time::ptime timestamp) {
+    size_t push_back_timestamp(int tag, boost::posix_time::ptime timestamp) {
         if (!timestamp.is_not_a_date_time())
-            push_back_timestamp(
+            return push_back_timestamp(
                 tag,
                 timestamp.date().year(),
                 timestamp.date().month(),
@@ -1367,9 +1395,9 @@ public:
 
     \see HFFIX_NO_BOOST_DATETIME
     */
-    void push_back_timestamp_nano(int tag, boost::posix_time::ptime timestamp) {
+    size_t push_back_timestamp_nano(int tag, boost::posix_time::ptime timestamp) {
         if (!timestamp.is_not_a_date_time())
-            push_back_timestamp_nano(
+            return push_back_timestamp_nano(
                 tag,
                 timestamp.date().year(),
                 timestamp.date().month(),
@@ -1404,11 +1432,11 @@ public:
     \throw std::out_of_range When the remaining buffer size is too small.
     */
     template<typename Clock, typename Duration>
-    void push_back_timestamp(int tag, std::chrono::time_point<Clock,Duration> tp) {
+    size_t push_back_timestamp(int tag, std::chrono::time_point<Clock,Duration> tp) {
         // TODO: with c++20, we can use std::chrono::format
         int year, month, day, hour, minute, second, millisecond;
         details::timepointtoparts(tp, year, month, day, hour, minute, second, millisecond);
-        push_back_timestamp(tag, year, month, day, hour, minute, second, millisecond);
+        return push_back_timestamp(tag, year, month, day, hour, minute, second, millisecond);
     }
 
     /*!
@@ -1426,11 +1454,11 @@ public:
     \throw std::out_of_range When the remaining buffer size is too small.
     */
     template<typename Clock, typename Duration>
-    void push_back_timestamp_nano(int tag, std::chrono::time_point<Clock,Duration> tp) {
+    size_t push_back_timestamp_nano(int tag, std::chrono::time_point<Clock,Duration> tp) {
         // TODO: with c++20, we can use std::chrono::format
         int year, month, day, hour, minute, second, nanosecond;
         details::timepointtoparts_nano(tp, year, month, day, hour, minute, second, nanosecond);
-        push_back_timestamp_nano(tag, year, month, day, hour, minute, second, nanosecond);
+        return push_back_timestamp_nano(tag, year, month, day, hour, minute, second, nanosecond);
     }
 
     /*!
@@ -1446,10 +1474,10 @@ public:
     \throw std::out_of_range When the remaining buffer size is too small.
     */
     template<typename Rep, typename Period>
-    void push_back_timeonly(int tag, std::chrono::duration<Rep,Period> timeonly) {
+    size_t push_back_timeonly(int tag, std::chrono::duration<Rep,Period> timeonly) {
         using namespace std::chrono;
 
-        push_back_timeonly(
+        return push_back_timeonly(
             tag,
             duration_cast<hours>       (timeonly).count(),
             duration_cast<minutes>     (timeonly %   hours(1)).count(),
@@ -1471,10 +1499,10 @@ public:
     \throw std::out_of_range When the remaining buffer size is too small.
     */
     template<typename Rep, typename Period>
-    void push_back_timeonly_nano(int tag, std::chrono::duration<Rep,Period> timeonly) {
+    size_t push_back_timeonly_nano(int tag, std::chrono::duration<Rep,Period> timeonly) {
         using namespace std::chrono;
 
-        push_back_timeonly_nano(
+        return push_back_timeonly_nano(
             tag,
             duration_cast<hours>      (timeonly).count(),
             duration_cast<minutes>    (timeonly %   hours(1)).count(),
@@ -1514,7 +1542,7 @@ public:
 
     \throw std::out_of_range When the remaining buffer size is too small.
     */
-    void push_back_data(int tag_data_length, int tag_data, char const* begin, char const* end) {
+    size_t push_back_data(int tag_data_length, int tag_data, char const* begin, char const* end) {
         next_ = details::itoa(tag_data_length, next_, buffer_end_);
         if (next_ == buffer_end_) details::throw_range_error();
         *next_++ = '=';
@@ -1527,9 +1555,11 @@ public:
             details::throw_range_error();
         }
         *next_++ = '=';
+        size_t s = message_size();
         memcpy(next_, begin, end - begin);
         next_ += end - begin;
         *next_++ = '\x01';
+        return s;
     }
 
 
