@@ -837,6 +837,31 @@ public:
 
     //@}
 
+    /*! \name Special Fields */
+    //@{
+
+    /*!
+    \brief Append a placeholder field to the message.
+
+    \param tag FIX tag.
+    \param size size of the fill buffer.
+    \param fill Fill character.
+
+    \throw std::out_of_range When the remaining buffer size is too small.
+    */
+    size_t push_back_placeholder(int tag, size_t size, char fill=' ') {
+        next_ = details::itoa(tag, next_, buffer_end_);
+        if (buffer_end_ - next_ < size + 2) {
+            details::throw_range_error();
+        }
+        *next_++ = '=';
+        size_t s = message_size();
+        memset(next_, fill, size);
+        next_ += size;
+        *next_++ = '\x01';
+        return s;
+    }
+
     /*! \name String Fields */
     //@{
 
